@@ -4,7 +4,7 @@ import openai
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# Load your API keys from Render environment variables
+# Load keys from environment
 API_FOOTBALL_KEY = os.getenv("FOOTBALL_API_KEY")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -12,7 +12,6 @@ HEADERS = {
     "x-apisports-key": API_FOOTBALL_KEY
 }
 
-# Get last 5 matches of a team
 def get_team_stats(team_name):
     url = f"https://v3.football.api-sports.io/teams?search={team_name}"
     res = requests.get(url, headers=HEADERS).json()
@@ -33,7 +32,6 @@ def get_team_stats(team_name):
         summary += f"- {home} {goals['home']} - {goals['away']} {away}\n"
     return summary
 
-# /predict command function
 async def predict(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if len(context.args) < 3 or 'vs' not in context.args:
