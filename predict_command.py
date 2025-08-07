@@ -1,72 +1,30 @@
-import os
-import requests
-import openai
 from telegram import Update
 from telegram.ext import ContextTypes
+import logging
+import openai
+import os
 
-# API keys from environment
-API_FOOTBALL_KEY = os.getenv("FOOTBALL_API_KEY")
+# Set your OpenAI API key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-HEADERS = {
-    "x-apisports-key": API_FOOTBALL_KEY
-}
-
-def get_team_stats(team_name):
-    search_url = f"https://v3.football.api-sports.io/teams?search={team_name}"
-    res = requests.get(search_url, headers=HEADERS).json()
-
-    if not res['response']:
-        return None
-
-    team_id = res['response'][0]['team']['id']
-    fixtures_url = f"https://v3.football.api-sports.io/fixtures?team={team_id}&last=5"
-    fix_res = requests.get(fixtures_url, headers=HEADERS).json()
-
-    matches = fix_res['response']
-    if not matches:
-        return None
-
-    summary = f"{team_name} - Last 5 Matches:\n"
-    for match in matches:
-        home = match['teams']['home']['name']
-        away = match['teams']['away']['name']
-        score_home = match['goals']['home']
-        score_away = match['goals']['away']
-        summary += f"- {home} {score_home} : {score_away} {away}\n"
-    return summary
-
-# /predict command handler
+# === /predict command ===
 async def predict(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        if len(context.args) < 3 or 'vs' not in context.args:
-            await update.message.reply_text("⚠️ Usage: /predict Team1 vs Team2")
+        user_input = ' '.join(context.args)
+        if not user_input:
+            await update.message.reply_text("⚠️ Please add a match to predict. Example: `/predict Arsenal vs Chelsea`")
             return
 
-        team1, team2 = map(str.strip, ' '.join(context.args).split('vs'))
-
-        stats1 = get_team_stats(team1)
-        stats2 = get_team_stats(team2)
-
-        if not stats1 or not stats2:
-            await update.message.reply_text("❌ Couldn’t fetch stats for one or both teams.")
-            return
-
-        prompt = (
-            f"Based on the recent performances of these teams, predict the winner.\n\n"
-            f"{stats1}\n\n{stats2}\n\n"
-            "Give a final score prediction and a 2-sentence explanation."
-        )
-
-        ai_response = openai.ChatCompletion.create(
+        # Basic AI response (you can improve this with actual logic)
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=300,
-            temperature=0.7
+            messages=[{"role": "user", "content": f"Predict this match: {user_input}"}],
+            max_tokens=150
         )
 
-        prediction = ai_response['choices'][0]['message']['content']
-        await update.message.reply_text(f"🔮 AI Prediction:\n{prediction}")
+        prediction = response['choices'][0]['message']['content']
+        await update.message.reply_text(prediction)
 
     except Exception as e:
-        await update.message.reply_text(f"⚠️ Error occurred: {str(e)}")
+        logging.error(f"❌ Error in /predict: {e}")
+        await update.message.reply_text("⚠️ Sorry, something went wrong. Try again later.")
