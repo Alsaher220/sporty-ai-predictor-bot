@@ -1,35 +1,22 @@
-import logging
-import threading
 import os
-from flask import Flask
-from telegram.ext import ApplicationBuilder, CommandHandler
+import logging
+from dotenv import load_dotenv
+from telegram.ext import Application, CommandHandler
 from predict_command import predict
 
-# === Logging ===
+load_dotenv()
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+
 logging.basicConfig(level=logging.INFO)
 
-# === Check environment variable for Telegram Bot Token ===
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-if not TELEGRAM_TOKEN:
-    raise ValueError("⚠️ TELEGRAM_BOT_TOKEN environment variable is missing!")
+if not TELEGRAM_BOT_TOKEN:
+    raise ValueError("TELEGRAM_BOT_TOKEN is missing in the environment variables")
 
-# === Flask app for Render uptime ===
-app = Flask(__name__)
+app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-@app.route('/')
-def home():
-    return "✅ SportyScoreProBot is alive!"
+app.add_handler(CommandHandler("predict", predict))
 
-def run_flask():
-    app.run(host="0.0.0.0", port=10000)
-
-# === Start Telegram Bot ===
-def run_telegram_bot():
-    app_bot = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    app_bot.add_handler(CommandHandler("predict", predict))
-    logging.info("🚀 SportyScoreProBot is starting...")
-    app_bot.run_polling()
-
-if __name__ == '__main__':
-    threading.Thread(target=run_flask).start()
-    run_telegram_bot()
+if __name__ == "__main__":
+    logging.info("Bot is starting...")
+    app.run_polling()
