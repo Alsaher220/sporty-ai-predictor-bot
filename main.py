@@ -1,36 +1,56 @@
-import os
-from threading import Thread
+import logging
 from flask import Flask
+import threading
+import openai
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-from predict_command import predict
+import os
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+# === Set your OpenAI API key ===
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
+# === Flask app to prevent Render timeout ===
 app = Flask(__name__)
 
-@app.route("/")
+@app.route('/')
 def home():
-    return "Alive", 200
+    return "SportyScoreProBot is running!"
 
 def run_flask():
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
+    app.run(host="0.0.0.0", port=10000)
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "👋 Welcome to Sporty Score Bot!\n Send /predict Team1 vs Team2"
-    )
+# === Telegram command: /predict ===
+async def predict(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        question = ' '.join(context.args)
+        if not question:
+            await update.message.reply_text("⚠️ Please add a match prediction question after /predict.")
+            return
 
-def main():
-    # Start Flask for health check
-    Thread(target=run_flask, daemon=True).start()
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": f"Predict the outcome of this football match with reasoning: {question}"}],
+            max_tokens=150
+        )
 
-    # Start Telegram bot
-    telegram_app = ApplicationBuilder().token(BOT_TOKEN).build()
-    telegram_app.add_handler(CommandHandler("start", start))
-    telegram_app.add_handler(CommandHandler("predict", predict))
-    print("✅ Bot running...")
-    telegram_app.run_polling()
+        prediction = response['choices'][0]['message']['content']
+        await update.message.reply_text(prediction)
 
-if __name__ == "__main__":
-    main()
+    except Exception as e:
+        logging.error(f"Error in /predict: {e}")
+        await update.message.reply_text("⚠️ Sorry, there was an error generating the prediction.")
+
+# === Main ===
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+
+    # Start the Flask server in a separate thread
+    threading.Thread(target=run_flask).start()
+
+    # Start the Telegram bot
+    telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    app_bot = ApplicationBuilder().token(telegram_token).build()
+    app_bot.add_handler(CommandHandler("predict", predict))
+
+    logging.info("✅ SportyScoreProBot is starting...")
+    app_bot.run_polling()
