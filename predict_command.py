@@ -4,7 +4,7 @@ import openai
 from telegram import Update
 from telegram.ext import ContextTypes
 
-# Load API keys
+# API keys from environment
 API_FOOTBALL_KEY = os.getenv("FOOTBALL_API_KEY")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
@@ -12,19 +12,18 @@ HEADERS = {
     "x-apisports-key": API_FOOTBALL_KEY
 }
 
-# Fetch recent match stats for a team
 def get_team_stats(team_name):
     search_url = f"https://v3.football.api-sports.io/teams?search={team_name}"
-    response = requests.get(search_url, headers=HEADERS).json()
+    res = requests.get(search_url, headers=HEADERS).json()
 
-    if not response['response']:
+    if not res['response']:
         return None
 
-    team_id = response['response'][0]['team']['id']
+    team_id = res['response'][0]['team']['id']
     fixtures_url = f"https://v3.football.api-sports.io/fixtures?team={team_id}&last=5"
-    fix_response = requests.get(fixtures_url, headers=HEADERS).json()
+    fix_res = requests.get(fixtures_url, headers=HEADERS).json()
 
-    matches = fix_response['response']
+    matches = fix_res['response']
     if not matches:
         return None
 
@@ -35,10 +34,9 @@ def get_team_stats(team_name):
         score_home = match['goals']['home']
         score_away = match['goals']['away']
         summary += f"- {home} {score_home} : {score_away} {away}\n"
-
     return summary
 
-# /predict command
+# /predict command handler
 async def predict(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         if len(context.args) < 3 or 'vs' not in context.args:
