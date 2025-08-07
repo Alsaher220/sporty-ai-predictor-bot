@@ -1,26 +1,35 @@
+import os
+import logging
 from telegram import Update
 from telegram.ext import ContextTypes
-import logging
-import openai
-import os
+from openai import OpenAI
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+logging.basicConfig(level=logging.INFO)
+
+openai_api_key = os.getenv("OPENAI_API_KEY")
+
+if not openai_api_key:
+    raise ValueError("OPENAI_API_KEY is missing in the environment variables")
+
+client = OpenAI(api_key=openai_api_key)
 
 async def predict(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        message = update.message.text
-        prompt = f"Based on current stats, predict the outcome of this football match: {message}"
-        
-        response = openai.ChatCompletion.create(
+        prompt = " ".join(context.args)
+        if not prompt:
+            await update.message.reply_text("⚠️ Please provide a match to predict.\nExample:\n`/predict Chelsea vs Real Madrid on Saturday`")
+            return
+
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": f"Predict the outcome of this football match based on stats and recent form: {prompt}"}],
             max_tokens=150,
-            temperature=0.7
+            temperature=0.7,
         )
 
-        prediction = response.choices[0].message["content"]
+        prediction = response.choices[0].message.content
         await update.message.reply_text(f"⚽ Prediction:\n{prediction}")
 
     except Exception as e:
         logging.error(f"Error in /predict: {e}")
-        await update.message.reply_text(f"⚠️ Error: {e}")
+        await update.message.reply_text("⚠️ Something went wrong. Please try again later.")
